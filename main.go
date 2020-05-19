@@ -60,8 +60,8 @@ func nsEnterCommand(arg ...string) error {
 }
 
 func nsEnterPrivilegedCommand(target int, arg ...string) error {
-	args := append([]string{"--target " + strconv.Itoa(target),
-		"--mount", "--uts", "--ipc", "--net", "--pid", "--"}, arg...)
+	args := append([]string{"-t" + strconv.Itoa(target),
+		"-m", "-u", "-i", "-n", "-p", "--"}, arg...)
 	if out, err := exec.Command("/usr/bin/nsenter", args...).CombinedOutput(); err != nil {
 		return errors.New(string(out))
 	}
