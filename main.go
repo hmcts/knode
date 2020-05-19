@@ -23,10 +23,18 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	_ "runtime"
+	"strconv"
 	"time"
 
+	"github.com/ghodss/yaml"
 	"k8s.io/klog/v2"
 )
+
+type Command struct {
+	Target       int      `yaml:target`
+	Instructions []string `yaml:"instructions"`
+}
 
 func readFile(name string) ([]byte, error) {
 	file, err := os.Open(name)
@@ -51,6 +59,15 @@ func nsEnterCommand(arg ...string) error {
 	return nil
 }
 
+func nsEnterPrivilegedCommand(target int, arg ...string) error {
+	args := append([]string{"--target " + strconv.Itoa(target),
+		"--mount", "--uts", "--ipc", "--net", "--pid", "--"}, arg...)
+	if out, err := exec.Command("/usr/bin/nsenter", args...).CombinedOutput(); err != nil {
+		return errors.New(string(out))
+	}
+	return nil
+}
+
 func daemonReload() error {
 	return nsEnterCommand("/bin/systemctl", "daemon-reload")
 }
@@ -69,6 +86,23 @@ func restartContainerd() error {
 
 func enableContainerd() error {
 	return nsEnterCommand("/bin/systemctl", "enable", "containerd")
+}
+
+func runPrivilegedCommand() error {
+	commandArgs, err := readFile("/configs/run.privileged")
+	if err != nil {
+		return err
+	}
+	if len(commandArgs) == 0 {
+		return nil
+	}
+
+	var command Command
+	if err := yaml.Unmarshal(commandArgs, &command); err != nil {
+		return err
+	}
+
+	return nsEnterPrivilegedCommand(command.Target, command.Instructions...)
 }
 
 func updateContainerd() error {
@@ -266,6 +300,9 @@ func runInit() error {
 		return err
 	}
 	if err := configureKubelet(); err != nil {
+		return err
+	}
+	if err := runPrivilegedCommand(); err != nil {
 		return err
 	}
 	return nil

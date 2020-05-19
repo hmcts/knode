@@ -1,0 +1,14 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemon
+  namespace: system
+  labels:
+    k8s-app: knode
+spec:
+  minReadySeconds: 120
+  template:
+    metadata:
+      annotations:
+        knode.jpang.dev/mode: ipv6disable
